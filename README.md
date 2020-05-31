@@ -1,0 +1,2 @@
+# AppRemover
+Harmful Application Remover
