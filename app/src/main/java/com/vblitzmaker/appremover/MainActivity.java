@@ -6,8 +6,6 @@ import android.content.pm.PackageInfo;
 import android.net.Uri;
 import android.os.Bundle;
 
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.google.android.material.snackbar.Snackbar;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -16,7 +14,6 @@ import com.google.firebase.database.ValueEventListener;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -36,7 +33,7 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnItem
 
     private static final String TAG = "AppRemover";
     private static final int  DELETE_REQUEST_CODE = 1;
-    private ArrayList<AppItem> appList, installedAppList,commonList;
+    private ArrayList<AppItem> dbAppList, installedAppList,commonList;
     private RecyclerView recyclerView;
     private Button btnScan;
     private TextView tvEmptyList;
@@ -46,9 +43,9 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnItem
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        appList = new ArrayList<>();
-
-
+        dbAppList = new ArrayList<>();
+        commonList = new ArrayList<>();
+        installedAppList=new ArrayList<>();
         recyclerView = (RecyclerView)findViewById(R.id.rvApps);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         tvEmptyList = (TextView)findViewById(R.id.tvEmptyList);
@@ -61,25 +58,25 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnItem
                 compareItems();
             }
         });
-
         getInstalledPackages();
         registerDatabase();
-
     }
 
+    /**
+     * Function to compare the database list and installed packages
+     */
     private void compareItems() {
-        commonList = new ArrayList<>();
-
+        commonList.clear();
         for (AppItem installedItem:
              installedAppList) {
-            for (AppItem harmful:appList
+            for (AppItem harmful: dbAppList
                  ) {
                 if(installedItem.p_name.equals(harmful.p_name)) {
                     commonList.add(installedItem);
                 }
             }
         }
-
+        //Create the adapter
         AppAdapter adapter = new AppAdapter(this,commonList);
         adapter.setOnClickListener(this);
         recyclerView.setAdapter(adapter);
@@ -89,8 +86,11 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnItem
         }
     }
 
+    /**
+     * Function to populate the list of installed applications
+     */
     private void getInstalledPackages() {
-        installedAppList=new ArrayList<>();
+        installedAppList.clear();
         List<PackageInfo> packageList = getPackageManager().getInstalledPackages(0);
         for(int i=0;i<packageList.size();i++) {
             PackageInfo info=packageList.get(i);
@@ -102,6 +102,9 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnItem
         }
     }
 
+    /**
+     * Function to register the connection to database
+     */
     private void registerDatabase() {
         FirebaseDatabase database = FirebaseDatabase.getInstance();
         DatabaseReference myRef = database.getReference("/");
@@ -112,14 +115,14 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnItem
             public void onDataChange(DataSnapshot dataSnapshot) {
                 // This method is called once with the initial value and again
                 // whenever data at this location is updated.
-                appList.clear();
+                dbAppList.clear();
                 Log.d(TAG, "onDataChange: count: "+ dataSnapshot.getChildrenCount());
                 HashMap<String,String> tmpMap=null;
                 for (DataSnapshot itemSnapShot:dataSnapshot.getChildren()
                      ) {
                     Log.d(TAG, "onDataChange item: "+itemSnapShot.getKey());
                     tmpMap = (HashMap<String,String>)itemSnapShot.getValue();
-                    appList.add(new AppItem(tmpMap.get("a_name"),tmpMap.get("p_name")));
+                    dbAppList.add(new AppItem(tmpMap.get("a_name"),tmpMap.get("p_name")));
                 }
                 btnScan.setEnabled(true);
             }
@@ -156,6 +159,7 @@ public class MainActivity extends AppCompatActivity implements AppAdapter.OnItem
 
     @Override
     public void onItemClick(View view, int position) {
+        //Create the delete intent an start activity for result
         Intent deleteIntent = new Intent(Intent.ACTION_DELETE);
         deleteIntent.setData(Uri.parse("package:"+commonList.get(position).p_name));
         deleteIntent.putExtra(Intent.EXTRA_RETURN_RESULT,true);
